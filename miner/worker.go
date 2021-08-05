@@ -167,8 +167,9 @@ type worker struct {
 	snapshotState *state.StateDB
 
 	// atomic status counters
-	running int32 // The indicator whether the consensus engine is running or not.
-	newTxs  int32 // New arrival transaction count since last sealing work submitting.
+	running     int32 // The indicator whether the consensus engine is running or not.
+	newTxs      int32 // New arrival transaction count since last sealing work submitting.
+	commitEmpty int32 // sealing work committing times when without transaction.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -308,6 +309,18 @@ func (w *worker) close() {
 	}
 	atomic.StoreInt32(&w.running, 0)
 	close(w.exitCh)
+}
+
+func (w *worker) clearCommitEmpty() {
+	atomic.StoreInt32(&w.commitEmpty, 0)
+}
+
+func (w *worker) addCommitEmpty() {
+	atomic.AddInt32(&w.commitEmpty, 1)
+}
+
+func (w *worker) commitAble() bool {
+	return atomic.LoadInt32(&w.commitEmpty) < 9
 }
 
 // recalcRecommit recalculates the resubmitting interval upon feedback.
@@ -603,7 +616,7 @@ func (w *worker) resultLoop() {
 				log.Error("Block found but no relative pending task", "number", num, "sealhash", sealhash, "hash", hash)
 				continue
 			}
-			if len(task.receipts) == 0 && num > params.MinFullBlocks {
+			if len(task.receipts) == 0 && num > params.MinFullBlocks && !w.commitAble() {
 				log.Info("Shawn, new block without tx and ignore", "number", num, "sealhash", sealhash, "hash", hash)
 				continue
 			}
@@ -968,8 +981,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// But if we disable empty precommit already, ignore it. Since
 	// empty block is necessary to keep the liveness of the network.
 	if len(pending) == 0 && num.Uint64() > params.MinFullBlocks { // Shawn, changed
-		w.updateSnapshot()
-		return
+		if !w.commitAble() {
+			w.updateSnapshot()
+			return
+		}
+		w.addCommitEmpty()
+	} else {
+		w.clearCommitEmpty()
 	}
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
