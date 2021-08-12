@@ -915,6 +915,27 @@ func (bc *BlockChain) GetBlockByNumber(number uint64) *types.Block {
 	return bc.GetBlock(hash, number)
 }
 
+// GetBlockByNumber retrieves a block from the database by number, caching it
+// (associated with its hash) if found.
+func (bc *BlockChain) GetLatestTxBlockNumber() (number uint64) {
+	for i := bc.CurrentBlock().NumberU64(); i > 0; i-- {
+		hash := rawdb.ReadCanonicalHash(bc.db, i)
+		if hash != (common.Hash{}) {
+			b := bc.GetBlock(hash, i)
+			if len(b.Transactions()) > 0 {
+				number = i
+				break
+			}
+		}
+	}
+
+	if number < params.MinFullBlocks {
+		number = params.MinFullBlocks
+	}
+
+	return
+}
+
 // GetReceiptsByHash retrieves the receipts for all transactions in a given block.
 func (bc *BlockChain) GetReceiptsByHash(hash common.Hash) types.Receipts {
 	if receipts, ok := bc.receiptsCache.Get(hash); ok {

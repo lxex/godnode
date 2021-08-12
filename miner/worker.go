@@ -167,9 +167,9 @@ type worker struct {
 	snapshotState *state.StateDB
 
 	// atomic status counters
-	running     int32 // The indicator whether the consensus engine is running or not.
-	newTxs      int32 // New arrival transaction count since last sealing work submitting.
-	commitEmpty int32 // sealing work committing times when without transaction.
+	running        int32  // The indicator whether the consensus engine is running or not.
+	newTxs         int32  // New arrival transaction count since last sealing work submitting.
+	latestCommitTx uint64 // latest block bumber of committing transaction.
 
 	// noempty is the flag used to control whether the feature of pre-seal empty
 	// block is enabled. The default value is false(pre-seal is enabled by default).
@@ -311,16 +311,21 @@ func (w *worker) close() {
 	close(w.exitCh)
 }
 
-func (w *worker) clearCommitEmpty() {
-	atomic.StoreInt32(&w.commitEmpty, 0)
+func (w *worker) setCommitTx(number uint64) {
+	atomic.StoreUint64(&w.latestCommitTx, number)
 }
 
-func (w *worker) addCommitEmpty() {
-	atomic.AddInt32(&w.commitEmpty, 1)
-}
+func (w *worker) commitAble(number uint64) bool {
+	if number <= params.MinFullBlocks {
+		return true
+	}
 
-func (w *worker) commitAble() bool {
-	return atomic.LoadInt32(&w.commitEmpty) < 9
+	if atomic.LoadUint64(&w.latestCommitTx) == 0 {
+		latest := w.chain.GetLatestTxBlockNumber()
+		atomic.StoreUint64(&w.latestCommitTx, latest)
+	}
+
+	return atomic.LoadUint64(&w.latestCommitTx) >= number-8
 }
 
 // recalcRecommit recalculates the resubmitting interval upon feedback.
@@ -616,7 +621,7 @@ func (w *worker) resultLoop() {
 				log.Error("Block found but no relative pending task", "number", num, "sealhash", sealhash, "hash", hash)
 				continue
 			}
-			if len(task.receipts) == 0 && num > params.MinFullBlocks && !w.commitAble() {
+			if len(task.receipts) == 0 && !w.commitAble(num) {
 				log.Info("Shawn, new block without tx and ignore", "number", num, "sealhash", sealhash, "hash", hash)
 				continue
 			}
@@ -980,14 +985,13 @@ func (w *worker) commitNewWork(interrupt *int32, noempty bool, timestamp int64) 
 	// Short circuit if there is no available pending transactions.
 	// But if we disable empty precommit already, ignore it. Since
 	// empty block is necessary to keep the liveness of the network.
-	if len(pending) == 0 && num.Uint64() > params.MinFullBlocks { // Shawn, changed
-		if !w.commitAble() {
+	if len(pending) == 0 { // Shawn, changed
+		if !w.commitAble(num.Uint64()) {
 			w.updateSnapshot()
 			return
 		}
-		w.addCommitEmpty()
 	} else {
-		w.clearCommitEmpty()
+		w.setCommitTx(header.Number.Uint64())
 	}
 	// Split the pending transactions into locals and remotes
 	localTxs, remoteTxs := make(map[common.Address]types.Transactions), pending
