@@ -1,1 +1,1 @@
-# support god network
+# God Network Node
