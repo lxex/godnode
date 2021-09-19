@@ -201,6 +201,7 @@ func SetupGenesisBlockWithOverride(db ethdb.Database, genesis *Genesis, override
 		}
 	}
 	// Get the existing chain configuration.
+	log.Info("Found stored", "stored", stored.String())
 	newcfg := genesis.configOrDefault(stored)
 	if overrideBerlin != nil {
 		newcfg.BerlinBlock = overrideBerlin
