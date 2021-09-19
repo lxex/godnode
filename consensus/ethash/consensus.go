@@ -62,6 +62,9 @@ var (
 	// parent block's time and difficulty. The calculation uses the Byzantium rules.
 	// Specification EIP-649: https://eips.ethereum.org/EIPS/eip-649
 	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
+
+	calcDifficultyJiangXi = makeDifficultyCalculator2(big.NewInt(1000000))
+	maxJiangXiDifficult   = big.NewInt(5000000)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -315,6 +318,8 @@ func (ethash *Ethash) CalcDifficulty(chain consensus.ChainHeaderReader, time uin
 func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Header) *big.Int {
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
+	case config.IsJiangXi(next):
+		return calcDifficultyJiangXi(time, parent)
 	case config.IsMuirGlacier(next):
 		return calcDifficultyEip2384(time, parent)
 	case config.IsConstantinople(next):
@@ -398,6 +403,17 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 			x.Add(x, y)
 		}
 		return x
+	}
+}
+
+// makeDifficultyCalculator2 for JiangXi
+func makeDifficultyCalculator2(baseDifficult *big.Int) func(time uint64, parent *types.Header) *big.Int {
+	baseDifficultFromParent := new(big.Int).Add(baseDifficult, big1)
+	return func(time uint64, parent *types.Header) *big.Int {
+		if parent.Difficulty.Cmp(maxJiangXiDifficult) > 0 {
+			return baseDifficultFromParent
+		}
+		return new(big.Int).Add(parent.Difficulty, big1)
 	}
 }
 
