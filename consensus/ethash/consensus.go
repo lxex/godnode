@@ -63,8 +63,8 @@ var (
 	// Specification EIP-649: https://eips.ethereum.org/EIPS/eip-649
 	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
 
-	calcDifficultyJiangXi = makeDifficultyCalculator2(big.NewInt(1000000))
-	maxJiangXiDifficult   = big.NewInt(5000000)
+	calcDifficultyJiangXi = makeDifficultyCalculator2(big.NewInt(100000))
+	maxJiangXiDifficult   = big.NewInt(1011000)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -319,7 +319,7 @@ func CalcDifficulty(config *params.ChainConfig, time uint64, parent *types.Heade
 	next := new(big.Int).Add(parent.Number, big1)
 	switch {
 	case config.IsJiangXi(next):
-		return calcDifficultyJiangXi(time, parent)
+		return calcDifficultyJiangXi(config.IsJiangXiBlock.Cmp(next), parent)
 	case config.IsMuirGlacier(next):
 		return calcDifficultyEip2384(time, parent)
 	case config.IsConstantinople(next):
@@ -407,11 +407,16 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 }
 
 // makeDifficultyCalculator2 for JiangXi
-func makeDifficultyCalculator2(baseDifficult *big.Int) func(time uint64, parent *types.Header) *big.Int {
-	baseDifficultFromParent := new(big.Int).Add(baseDifficult, big1)
-	return func(time uint64, parent *types.Header) *big.Int {
-		if parent.Difficulty.Cmp(maxJiangXiDifficult) > 0 {
-			return baseDifficultFromParent
+func makeDifficultyCalculator2(baseDifficult *big.Int) func(diff int, parent *types.Header) *big.Int {
+	return func(diff int, parent *types.Header) *big.Int {
+		exceed := parent.Difficulty.Cmp(maxJiangXiDifficult)
+		if diff == 0 && exceed > 0 {
+			baseDifficultFromParent := new(big.Int).Mul(baseDifficult, big.NewInt(10))
+			return new(big.Int).Add(baseDifficultFromParent, big1)
+		}
+
+		if exceed > 0 {
+			return new(big.Int).Add(baseDifficult, big1)
 		}
 		return new(big.Int).Add(parent.Difficulty, big1)
 	}
