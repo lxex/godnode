@@ -44,6 +44,9 @@ const (
 	// txChanSize is the size of channel listening to NewTxsEvent.
 	// The number is referenced from the size of tx pool.
 	txChanSize = 4096
+
+	// The minimum number of peers used to broadcast tx
+	minBroadcastPeers = 5
 )
 
 var (
@@ -444,7 +447,14 @@ func (h *handler) BroadcastBlock(block *types.Block, propagate bool) {
 			return
 		}
 		// Send the block to a subset of our peers
-		transfer := peers[:int(math.Sqrt(float64(len(peers))))]
+		numDirect := len(peers)
+		if numDirect > minBroadcastPeers {
+			numDirect = int(math.Sqrt(float64(numDirect)))
+			if numDirect < minBroadcastPeers {
+				numDirect = minBroadcastPeers
+			}
+		}
+		transfer := peers[:numDirect]
 		for _, peer := range transfer {
 			peer.AsyncSendNewBlock(block, td)
 		}
@@ -479,7 +489,13 @@ func (h *handler) BroadcastTransactions(txs types.Transactions) {
 	for _, tx := range txs {
 		peers := h.peers.peersWithoutTransaction(tx.Hash())
 		// Send the tx unconditionally to a subset of our peers
-		numDirect := int(math.Sqrt(float64(len(peers))))
+		numDirect := len(peers)
+		if numDirect > minBroadcastPeers {
+			numDirect = int(math.Sqrt(float64(numDirect)))
+			if numDirect < minBroadcastPeers {
+				numDirect = minBroadcastPeers
+			}
+		}
 		for _, peer := range peers[:numDirect] {
 			txset[peer] = append(txset[peer], tx.Hash())
 		}
