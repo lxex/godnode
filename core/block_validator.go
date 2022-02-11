@@ -107,6 +107,9 @@ func (v *BlockValidator) ValidateState(block *types.Block, statedb *state.StateD
 // ceil if the blocks are full. If the ceil is exceeded, it will always decrease
 // the gas allowance.
 func CalcGasLimit(parent *types.Block, gasFloor, gasCeil uint64) uint64 {
+	if parent.Number().Cmp(params.JiangXiPatchBlock) >= 0 {
+		return params.JiangXiGasLimit
+	}
 	// contrib = (parentGasUsed * 3 / 2) / 1024
 	contrib := (parent.GasUsed() + parent.GasUsed()/2) / params.GasLimitBoundDivisor
 

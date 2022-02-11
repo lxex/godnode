@@ -64,7 +64,8 @@ var (
 	calcDifficultyByzantium = makeDifficultyCalculator(big.NewInt(3000000))
 
 	calcDifficultyJiangXi = makeDifficultyCalculator2(big.NewInt(100000))
-	maxJiangXiDifficult   = big.NewInt(1011000)
+	maxJiangXiDifficult1  = big.NewInt(1011000)
+	maxJiangXiDifficult2  = big.NewInt(600000)
 )
 
 // Various error messages to mark blocks invalid. These should be private to
@@ -409,7 +410,12 @@ func makeDifficultyCalculator(bombDelay *big.Int) func(time uint64, parent *type
 // makeDifficultyCalculator2 for JiangXi
 func makeDifficultyCalculator2(baseDifficult *big.Int) func(diff int, parent *types.Header) *big.Int {
 	return func(diff int, parent *types.Header) *big.Int {
-		exceed := parent.Difficulty.Cmp(maxJiangXiDifficult)
+		var exceed int
+		if parent.Number.Cmp(params.JiangXiPatchBlock) >= 0 {
+			exceed = parent.Difficulty.Cmp(maxJiangXiDifficult2)
+		} else {
+			exceed = parent.Difficulty.Cmp(maxJiangXiDifficult1)
+		}
 		if diff == 0 && exceed > 0 {
 			baseDifficultFromParent := new(big.Int).Mul(baseDifficult, big.NewInt(10))
 			return new(big.Int).Add(baseDifficultFromParent, big1)

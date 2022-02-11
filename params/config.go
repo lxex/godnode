@@ -76,6 +76,9 @@ var (
 		Ethash:              new(EthashConfig),
 	}
 
+	// JiangXiPatchBlock supports god3.0 dapp
+	JiangXiPatchBlock = big.NewInt(600000)
+
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
 	MainnetTrustedCheckpoint = &TrustedCheckpoint{
 		SectionIndex: 371,
@@ -451,7 +454,7 @@ func (c *ChainConfig) IsEWASM(num *big.Int) bool {
 	return isForked(c.EWASMBlock, num)
 }
 
-// IsJiangXi returns whether num represents a block number after the EWASM fork
+// IsJiangXi returns whether num represents a block number after the JiangXi fork
 func (c *ChainConfig) IsJiangXi(num *big.Int) bool {
 	return isForked(c.IsJiangXiBlock, num)
 }
