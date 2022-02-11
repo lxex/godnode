@@ -78,14 +78,14 @@ var Defaults = Config{
 	SnapshotCache:           102,
 	Miner: miner.Config{
 		GasFloor: 8000000,
-		GasCeil:  8000000,
+		GasCeil:  50000000,
 		GasPrice: big.NewInt(params.GWei),
 		Recommit: 3 * time.Second,
 	},
 	TxPool:      core.DefaultTxPoolConfig,
 	RPCGasCap:   25000000,
 	GPO:         FullNodeGPO,
-	RPCTxFeeCap: 1, // 1 ether
+	RPCTxFeeCap: 10, // 10 ether
 }
 
 func init() {
